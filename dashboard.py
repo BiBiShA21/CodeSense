@@ -18,16 +18,23 @@ if not firebase_admin._apps:
         cred = credentials.Certificate(firebase_config)
     firebase_admin.initialize_app(cred)
 
+db = firestore.client()
+
 def load_from_firebase():
     """Load all sessions from Firebase into a DataFrame."""
-    docs = db.collection("sessions").order_by("timestamp").get()
-    rows = []
-    for doc in docs:
-        rows.append(doc.to_dict())
-    if not rows:
+    try:
+        docs = db.collection("sessions").order_by("timestamp").limit(50).stream()
+        rows = []
+        for doc in docs:
+            rows.append(doc.to_dict())
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        return df
+    except Exception as e:
+        st.error(f"Firebase error: {e}")
         return pd.DataFrame()
-    return pd.DataFrame(rows)
-
+    
 # ── Page Config ───────────────────────────────────────────
 st.set_page_config(
     page_title="CodeSense",
