@@ -3,7 +3,30 @@ import pandas as pd
 import joblib
 import time
 import os
+import firebase_admin
+from firebase_admin import credentials, firestore
 from utils import get_ai_suggestion, calculate_focus_score
+
+# ── Firebase Setup ────────────────────────────────────────
+if not firebase_admin._apps:
+    if os.path.exists("firebase_key.json"):
+        cred = credentials.Certificate("firebase_key.json")
+    else:
+        import json
+        firebase_config = dict(st.secrets["firebase"])
+        firebase_config["private_key"] = firebase_config["private_key"].replace("\\n", "\n")
+        cred = credentials.Certificate(firebase_config)
+    firebase_admin.initialize_app(cred)
+
+def load_from_firebase():
+    """Load all sessions from Firebase into a DataFrame."""
+    docs = db.collection("sessions").order_by("timestamp").get()
+    rows = []
+    for doc in docs:
+        rows.append(doc.to_dict())
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows)
 
 # ── Page Config ───────────────────────────────────────────
 st.set_page_config(
@@ -230,7 +253,7 @@ while True:
         time.sleep(5)
         continue
 
-    df = pd.read_csv("data/sessions.csv")
+    df = load_from_firebase()
 
     if len(df) == 0:
         with placeholder.container():
