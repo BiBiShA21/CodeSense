@@ -12,7 +12,6 @@ if not firebase_admin._apps:
     if os.path.exists("firebase_key.json"):
         cred = credentials.Certificate("firebase_key.json")
     else:
-        import json
         firebase_config = dict(st.secrets["firebase"])
         firebase_config["private_key"] = firebase_config["private_key"].replace("\\n", "\n")
         cred = credentials.Certificate(firebase_config)
@@ -29,12 +28,11 @@ def load_from_firebase():
             rows.append(doc.to_dict())
         if not rows:
             return pd.DataFrame()
-        df = pd.DataFrame(rows)
-        return df
+        return pd.DataFrame(rows)
     except Exception as e:
         st.error(f"Firebase error: {e}")
         return pd.DataFrame()
-    
+
 # ── Page Config ───────────────────────────────────────────
 st.set_page_config(
     page_title="CodeSense",
@@ -47,7 +45,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@300;400;600&display=swap');
 
-/* Hide Streamlit default UI */
 #MainMenu { visibility: hidden; }
 header { visibility: hidden; }
 footer { visibility: hidden; }
@@ -70,7 +67,6 @@ html, body, [class*="css"] {
     max-width: 1200px;
 }
 
-/* Title */
 .title-container {
     text-align: center;
     padding: 15px 0 5px 0;
@@ -103,7 +99,6 @@ html, body, [class*="css"] {
     margin-top: -5px;
 }
 
-/* State card */
 .state-card {
     padding: 18px 25px;
     border-radius: 14px;
@@ -111,7 +106,6 @@ html, body, [class*="css"] {
     border: 1px solid rgba(255,255,255,0.08);
 }
 
-/* Live badge */
 .live-badge {
     display: inline-flex;
     align-items: center;
@@ -139,7 +133,6 @@ html, body, [class*="css"] {
     100% { transform: scale(1);   opacity: 1; }
 }
 
-/* Metrics */
 div[data-testid="stMetric"] {
     background: #13131f;
     border-radius: 12px;
@@ -158,7 +151,6 @@ div[data-testid="stMetricValue"] {
     font-size: 1.4em !important;
 }
 
-/* Suggestion card */
 .suggestion-card {
     background: linear-gradient(135deg, #13131f, #1a1a2e);
     border-radius: 14px;
@@ -168,7 +160,6 @@ div[data-testid="stMetricValue"] {
     height: 100%;
 }
 
-/* Focus score */
 .score-container {
     text-align: center;
     padding: 15px;
@@ -178,7 +169,6 @@ div[data-testid="stMetricValue"] {
     border: 1px solid rgba(255,255,255,0.06);
 }
 
-/* Footer */
 .footer-text {
     text-align: center;
     color: #333;
@@ -243,7 +233,9 @@ iteration   = 0
 while True:
     iteration += 1
 
-    if not os.path.exists("data/sessions.csv"):
+    df = load_from_firebase()
+
+    if df.empty:
         with placeholder.container():
             st.markdown("""
             <div style='text-align:center; padding:60px; color:#444;'>
@@ -253,26 +245,7 @@ while True:
                      WAITING FOR DATA
                 </div>
                 <div style='color:#555; margin-top:8px; font-size:0.85em;'>
-                    Run tracker.py in another terminal to start
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        time.sleep(5)
-        continue
-
-    df = load_from_firebase()
-
-    if len(df) == 0:
-        with placeholder.container():
-            st.markdown("""
-            <div style='text-align:center; padding:60px; color:#444;'>
-                <div style='font-size:3em;'>🎹</div>
-                <div style='font-family:Orbitron; font-size:1em;
-                     letter-spacing:3px; margin-top:15px;'>
-                     START TYPING
-                </div>
-                <div style='color:#555; margin-top:8px; font-size:0.85em;'>
-                    First window records after 30 seconds of coding
+                    Run tracker.py on your laptop to start
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -298,7 +271,6 @@ while True:
     )
     focus_score = calculate_focus_score(df)
 
-    # Score color
     if focus_score >= 70:
         score_color = "#00C851"
         score_label = "Great Session! 🔥"
@@ -309,10 +281,8 @@ while True:
         score_color = "#ff4444"
         score_label = "Needs Improvement 😴"
 
-    # ── Render ────────────────────────────────────────────
     with placeholder.container():
 
-        # Live badge
         st.markdown(f"""
         <div style='display:flex; justify-content:flex-end; margin-bottom:8px;'>
             <div class='live-badge'>
@@ -322,7 +292,6 @@ while True:
         </div>
         """, unsafe_allow_html=True)
 
-        # Brain State Banner
         st.markdown(f"""
         <div class='state-card' style='
             background:{cfg["glow"]};
@@ -347,7 +316,6 @@ while True:
         </div>
         """, unsafe_allow_html=True)
 
-        # Focus Score + Metrics Row
         score_col, m1, m2, m3, m4 = st.columns([1.5, 1, 1, 1, 1])
 
         with score_col:
@@ -388,7 +356,6 @@ while True:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Charts + Suggestion
         left, right = st.columns([2, 1])
 
         with left:
@@ -400,16 +367,13 @@ while True:
             """, unsafe_allow_html=True)
 
             if len(df) > 1:
-                # Normalize each signal to 0-1 range for clean graph
                 chart_df = df[["typing_speed",
                                "error_rate",
                                "avg_pause"]].tail(20).copy()
-
                 for col in chart_df.columns:
                     max_val = chart_df[col].max()
                     if max_val > 0:
                         chart_df[col] = chart_df[col] / max_val
-
                 st.line_chart(chart_df, height=240)
                 st.caption("📊 Values normalized 0→1 for comparison")
             else:
@@ -438,7 +402,6 @@ while True:
             </div>
             """, unsafe_allow_html=True)
 
-        # Footer
         st.markdown(f"""
         <div class='footer-text'>
             CODESENSE &nbsp;•&nbsp;
